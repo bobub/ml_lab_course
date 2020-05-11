@@ -2,6 +2,7 @@
 
 PUT YOUR NAME HERE:
 Boris Bubla
+Leonard Paeleke
 
 
 Write the functions
@@ -13,68 +14,182 @@ Write your implementations in the given functions stubs!
 
 (c) Daniel Bartz, TU Berlin, 2013
 """
+
 import numpy as np
 import scipy.linalg as la
 import scipy.spatial as sp
+import matplotlib.pyplot as plt
+from scipy.linalg import expm
 
-class PCA():  # Algorithms in guide.pdf used, pg 15-17
+class PCA():
+    """
+        Definition of PCA Class
+        Algorithms in guide.pdf used, pg 15-17
+    """
     def __init__(self, Xtrain):
-        # Alg 1: Compute principal components
-        self.C = np.cov(Xtrain)
-        self.D, self.U = la.eigh(self.C)  # eigenvalues,eigenvectors
-
-        # arrange in descending order
-        descending = np.flip(np.argsort(self.D))
-        self.D = self.D[descending]
-        self.U = self.U[:, descending]
-
-        self.mean_ = np.mean(Xtrain, axis=0)  # mean
-
+        """
+            Compute Principal Components
+        """
+        # 1. centre data
+        self.Xmean = np.mean(Xtrain, axis = 0)
+        self.C = Xtrain - self.Xmean
+        # 2. generate covariance marix
+        self.C = np.cov(self.C.T)
+        # 3. calculate eigenvalues and eigenvectors
+        self.D, self.U = np.linalg.eig(self.C)
+        # Make a list of (eigenvalue, eigenvector) tuples
+        self.pairs = [(np.abs(self.D[i]), self.U[i]) for i in range(len(self.D))]
+        # Sort the (eigenvalue, eigenvector) tuples from high to low
+        self.pairs.sort()
+        self.pairs.reverse()
+        
+        self.U = -1*np.array([self.pairs[i][1] for i in range(len(self.pairs))]) # eigencevtors CAVEAT: mulitplying by -1 because numpy.eig routine delivers wrong sign
+        self.D = np.array([self.pairs[i][0] for i in range(len(self.pairs))]) # eigenvalues
     def project(self, Xtest, m):
-        # Alg 2: Project to low dim space
-        Z = np.empty((Xtest.shape[0], m))  # create output array
-        X_center = np.subtract(Xtest, self.mean_)  # center data
-        for i in range(Xtest.shape[0]):  # loop through samples
-            z = np.multiply(self.U[i][:m].T, X_center[i][:m]).T  # compute
-            Z = np.append(Z, [z], axis=0)
+        """
+            Projecting to the low-dimensional sub-space
+        """
+        # 1. centre data by mean of training
+        Xtest = Xtest - self.Xmean
+        # 2. project data to m principal components
+        Z = self.U.T[range(m)].dot(Xtest.T).T    
         return Z
-
     def denoise(self, Xtest, m):
+        """
+            Reconstructing projected data points in the original space
+        """
+        # 1. projection to the low-dimencsional sub-space
         Z = self.project(Xtest, m)
-        # Alg 3: Reconstruct in original space after project to low space
-        Y = np.empty(Xtest.shape)  # create output array
-        for i in range(Xtest.shape[0]):  # loop through samples
-            y = self.mean_ + Z[i][:m].dot(self.U[i][:m])  # compute
-            Y = np.append(Y, [y], axis=0)
+        # 2. recontraction by m dimensions
+        Y = Z.dot(self.U.T[range(m)])+self.Xmean
         return Y
 
 
 def gammaidx(X, k):
-    n, d = X.shape
+    """
+    Gamma identification for outlier detection by ranking
+    """
+    y = []
     # Calculate distance matrix
     D = sp.distance_matrix(X, X)
-    # y=np.empty((n,1))#create output array
-    y = []
-    # Find all k nearest neigbours
-    for i in range(n):
-        D_0 = np.asarray(D[i][:])  # array of distances relative to i'th data point
-        point = D_0[i]  # value at i'th data point
-        gamma = 0
-        for j in range(k):  # repeat for k nearest neigbours
-            idx = (np.abs(D_0 - point)).argmin()  # find nearest neighbour
-            gamma += np.abs(D_0[idx] - point)  # add distance/k to gamma for that point
-            D_0 = np.delete(D_0, idx)  # remove nearest neighbour from list
-        gamma = gamma/5
-        y = np.append(y, [gamma], axis=0)
-
+    # Sort distance matrix
+    kn = np.argsort(D,kind='mergesort')
+    # identify k-nearest neighbours
+    kn = kn[:,1:k+1]
+    # sum over k-neaest neighbours and divide bei k
+    y = np.sum(np.take_along_axis(D, kn, axis = 1),axis = 1)/k
+    
     return y
 
+def auc(y_true,y_pred,plot=False):
+    #1. FIND ROC CURVE POINTS & FPR/TPR
+    pos_label=1
+    y_true=(y_true==pos_label) #boolean vec of true labels
 
-def lle(X, m, n_rule, param, tol=1e-2):
-    ''' your header here!
-    '''
-    'Step 1: Finding the nearest neighbours by rule '
+    #arrange predictions in descending order (indexes)
+    descending_scores=np.argsort(y_pred,kind='mergesort')[::-1]
+    #ascending_scores=np.argsort(y_pred,kind='mergesort')[::1]
+    y_pred=y_pred[descending_scores]
+    y_true=y_true[descending_scores]
+
+    #determine distinct values to create an index of decreasing values
+    #'predicted value in y_pred where lower values tend to correspond to label -1 and higher values to label +1'
+    distinct_values_idx=np.where(np.diff(y_pred))[0]#length n-1 as calculating differences
+    distinct_descending_scores_idx=np.r_[distinct_values_idx,y_true.size-1]# add last entry
+
+    tps=np.cumsum(y_true)[distinct_descending_scores_idx]#cumulative sum of true positives using idx
+    fps=1-tps+distinct_descending_scores_idx #same as cum sum of false positives
+
+    #add 0,0 position for ROC curve
+    tps=np.r_[0,tps]
+    fps=np.r_[0,fps]
+
+    #false/true positive rate
+    fpr=fps/fps[-1] #rate=sum/max
+    tpr=tps/tps[-1]
     
-    'Step 2: local reconstruction weights'
+    #2.PLOT ROC CURVE POINTS
+    if plot==True:
+        plt.plot(fpr,tpr,label='Algorithm')
+        plt.plot(np.arange(0,1.1,0.1),np.arange(0,1.1,0.1),label='Random guesses')
+        plt.ylabel('True Positive Rate (TPR)')
+        plt.xlabel('False Positive Rate (FPR)')
+        plt.title('ROC Curve')
+        plt.legend()
+
+    #3. CALCULATE AUC
+    #reshape needed
+    fpr=fpr.reshape(1,fpr.shape[0])
+    tpr=tpr.reshape(1,tpr.shape[0])
     
-    'Step 3: compute embedding'
+    #assume positive area
+    end=1
+    #check if negative area (good discrimination, just switch labels)
+    diff_fpr=np.diff(fpr)
+    if np.all(diff_fpr<=0):
+        end=-1
+    #calculate area using trapezoidal approach
+    area=end*np.trapz(tpr,fpr)
+
+    return area
+
+
+def lle(X, m, tol, n_rule, k=None, epsilon=None):
+    """
+        Locally Linear Embedding
+    """
+    
+    # compute neighborhoord by kNN or eps-bole rule
+    
+    # 1. calculate euclidean distance of data
+    D = sp.distance_matrix(X, X)
+    
+    # 2. check for applied rule
+    if n_rule == 'knn':
+        # check if k is provided
+        assert (k != None), """The parameter 'k' is required for the 'knn' rule"""
+        # 3a. calculate k nearest neighbors
+        # Sort distance matrix
+        kn = np.argsort(D,kind='mergesort')
+        # identify k-nearest neighbors
+        kn = kn[:,1:k+1]
+        
+    elif n_rule == 'eps-ball':
+        # check if epsilon is provided
+        assert (epsilon != None), """The parameter 'epsilon' is required for the 'eps-ball' rule"""
+        # 3b. compare distance by epsilon
+        # tupel (1. element, 2. element)
+        idx = np.argwhere(D<epsilon)
+        # row wise all points in the neighborhood
+        kn = [idx[:,1][idx[:,0]==i] for i in np.unique(idx[:,0])]
+    else:
+        print("""The following rule {} is not known. Please use either 'knn' or 'eps-ball'.""".format(n_rule))
+    
+    # 4. calculate reconstruction weights 
+    # intialize weight matrix
+    W = np.zeros((len(X),len(X)))
+    # calculate weights for every point
+    for i in range(len(X)):
+        # calculate covariance matrix
+        C = np.cov(X[kn[i]])
+        # solve for weights 
+        I = np.eye(len(X[kn[i]]))
+        weights = np.linalg.inv(C-3*I).dot(np.ones(len(X[kn[i]])).reshape(len(X[kn[i]]),1))
+        # normalize weights
+        weights = (1/(weights.T.dot(np.ones(len(X[kn[i]])).reshape(len(X[kn[i]]),1)))*weights).reshape(len(X[kn[i]]))
+        W[i,kn[i]] = weights
+    
+    # 5. calculate cost matrix
+    I = np.eye(len(X))
+    M = (I - W).T@(I-W)
+    
+    # 6. Obtain eigenvalues and eigenvector of M
+    eigen_values, eigen_vector = np.linalg.eig(M)
+    # sort eigenvalues in ascending order
+    eigen_kn = np.argsort(abs(eigen_values),kind='mergesort').reshape(len(X),1)
+    # sort eigenvectors by eigenvalues, eigenvector along columns, first eigenvector -> [:,0]
+    V = -1*np.take_along_axis(eigen_vector.T, eigen_kn, axis = 0).T # CAVEAT: mulitplying by -1 because numpy.eig routine delivers wrong sign
+    
+    # 7. embedded dimension 
+    Y = V[:,1:m+1]
+    return Y

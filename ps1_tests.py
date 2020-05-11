@@ -134,10 +134,10 @@ class TestSheet1(unittest.TestCase):
 
         with self.subTest(n_rule='knn', k=30):
             Xp = imp.lle(X, 2, n_rule='knn', k=30, tol=1e-3)
-            #self.plot(Xt, Xp, 'knn')
+            self.plot(Xt, Xp, 'knn')
         with self.subTest(n_rule='eps-ball', epsilon=5.):
             Xp = imp.lle(X, 2, n_rule='eps-ball', epsilon=5., tol=1e-3)
-            #self.plot(Xt, Xp, 'eps-ball')
+            self.plot(Xt, Xp, 'eps-ball')
         with self.subTest(n_rule='eps-ball', epsilon=0.5):
             with self.assertRaises(ValueError, msg='Graph should not be connected and raise ValueError.'):
                 imp.lle(X, 2, n_rule='eps-ball', epsilon=0.5, tol=1e-3)
