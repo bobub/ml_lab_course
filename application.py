@@ -17,6 +17,10 @@ import numpy as np
 import pylab as pl
 import random
 import implementation.py as imp
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib
+from matplotlib import pyplot as plt
+
 imp = reload(imp)
 
 """
@@ -69,7 +73,7 @@ def assignment_5():
 
 
     # perform pca
-    pca = PCA(data_patterns.T)
+    pca = imp.PCA(data_patterns.T)
     plot_fun(pca)
 
     # Plot 3a).
@@ -94,7 +98,7 @@ def assignment_5():
             data_patterns_noisy[[0, 1, 2, 13, 34]] = sigma * np.random.randn(length, width) + data_patterns_noisy[
                 [0, 1, 2, 13, 34]]
 
-        pca_noise = PCA(data_patterns_noisy)
+        pca_noise = imp.PCA(data_patterns_noisy)
         plot_fun(pca_noise)
 
         # reconstruction by m principle components
@@ -125,7 +129,7 @@ def assignment_5():
             data_patterns_noisy[[0, 1, 2, 13, 34]] = sigma * np.random.randn(length, width) + data_patterns_noisy[
                 [0, 1, 2, 13, 34]]
 
-        pca_noise = PCA(data_patterns_noisy)
+        pca_noise = imp.PCA(data_patterns_noisy)
         # plot_fun(pca_noise)
 
         # reconstruction by m principle components
@@ -187,16 +191,16 @@ def outliers_calc():
             labels_ = np.append(labels_, np.ones((j, 1)), axis=0)
 
             # compute gamma 3,10,mean
-            gamma_3 = gammaidx(data_, 3)
-            gamma_10 = gammaidx(data_, 10)
+            gamma_3 = imp.gammaidx(data_, 3)
+            gamma_10 = imp.gammaidx(data_, 10)
             # compute dist_to_mean
             diff = np.subtract(data_, np.mean(data_, axis=0))
             dist_to_mean = np.linalg.norm(diff, axis=1)
 
             # compute auc
-            auc_3 = auc(labels_, gamma_3)
-            auc_10 = auc(labels_, gamma_10)
-            auc_mean = auc(labels_, dist_to_mean)
+            auc_3 = imp.auc(labels_, gamma_3)
+            auc_10 = imp.auc(labels_, gamma_10)
+            auc_mean = imp.auc(labels_, dist_to_mean)
 
             # store results
             results_3[i][np.argwhere(n_outliers == j)] = auc_3[0]
@@ -231,8 +235,8 @@ def outliers_exemplary():
     data_ = np.append(pos, outliers, axis=0)
 
     # compute gamma 3,10,mean
-    gamma_3 = gammaidx(data_, 3)
-    gamma_10 = gammaidx(data_, 10)
+    gamma_3 = imp.gammaidx(data_, 3)
+    gamma_10 = imp.gammaidx(data_, 10)
     # compute dist_to_mean
     diff = np.subtract(data_, np.mean(data_, axis=0))
     dist_to_mean = np.linalg.norm(diff, axis=1)
@@ -267,11 +271,102 @@ def outliers_exemplary():
 ASSIGNMENT 7 - LLE APPLICATION 
 """
 def lle_visualize():
+    # load data
+    cwd = os.getcwd()
+    file_name = 'fishbowl_dense.npz'
+    path_to_data = cwd + '/data/' + file_name
+    assert os.path.exists(path_to_data), "The path does not excist."
+    fishbowl = np.load(path_to_data)
 
-    
-    
+    cwd = os.getcwd()
+    file_name = 'swissroll_data.npz'
+    path_to_data = cwd + '/data/' + file_name
+    assert os.path.exists(path_to_data), "The path does not excist."
+    swissroll = np.load(path_to_data)
 
-def lle_noise():
+    cwd = os.getcwd()
+    file_name = 'flatroll_data.npz'
+    path_to_data = cwd + '/data/' + file_name
+    assert os.path.exists(path_to_data), "The path does not excist."
+    flatroll = np.load(path_to_data)
+
+    # format data and references
+    fishbowl_data = fishbowl['X'].T
+    fishbowl_ref = fishbowl['X'].T[:, 2]
+    swissroll_data = swissroll['x_noisefree'].T
+    swissroll_ref = swissroll['z'].T[:, 0]
+    flatroll_data = flatroll['Xflat'].T
+    flatroll_ref = flatroll['true_embedding'].T
+
+    # FISHBOWL
+    # apply lle
+    fishbowl_lle = imp.lle(fishbowl_data, 2, 0.00001, 'eps-ball',
+                       epsilon=0.29)  # k=50-80 is good, epsilon=0.27 is best so far
+
+    # plot
+
+    fig = plt.figure(figsize=(14, 6))
+
+    # normalize flatroll_ref -> values from 0 to 1
+    color_code = ((fishbowl_ref - min(fishbowl_ref)) / (max(fishbowl_ref) - min(fishbowl_ref))).reshape(
+        len(fishbowl_ref), )
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    ax.scatter(xs=fishbowl_data.T[0], ys=fishbowl_data.T[1], zs=fishbowl_data.T[2], s=1, c=color_code, cmap='hsv')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_zlabel('X3')
+    ax.set_xticks([-1, -0.5, 0, 0.5, 1])
+    ax.set_yticks([-1, -0.5, 0, 0.5, 1])
+    ax.set_zticks([-1, -0.5, 0, 0.5, 1])
+    ax.set_title('Fishbowl in 3D')
+    ax = fig.add_subplot(1, 2, 2)
+    ax.scatter(x=fishbowl_lle.T[0], y=fishbowl_lle.T[1], s=1, c=color_code, cmap='hsv')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_title('Fishbowl in 2D')
+
+    # SWISSROLL
+    # apply lle
+    swissroll_lle = imp.lle(swissroll_data, 2, 0.000001, 'eps-ball', epsilon=5)  # k=60 good, epsilon=7 good
+
+    # plot
+    fig = plt.figure(figsize=(14, 6))
+
+    # normalize flatroll_ref -> values from 0 to 1
+    color_code = ((swissroll_ref - min(swissroll_ref)) / (max(swissroll_ref) - min(swissroll_ref))).reshape(
+        len(swissroll_ref), )
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    ax.scatter(xs=swissroll_data.T[0], ys=swissroll_data.T[1], zs=swissroll_data.T[2], s=4, c=color_code, cmap='hsv')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_zlabel('X3')
+    ax.set_title('Swissroll in 3D')
+    ax = fig.add_subplot(1, 2, 2)
+    ax.scatter(x=swissroll_lle.T[0], y=swissroll_lle.T[1], s=4, c=color_code, cmap='hsv')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_title('Swissroll in 2D')
+
+    # FLATROLL
+    # apply lle
+    flatroll_lle = imp.lle(flatroll_data, 1, 0.00001, 'knn', k=7)
+
+    # plot
+    fig = plt.figure(figsize=(18, 8))
+    # normalize flatroll_ref -> values from 0 to 1
+    color_code = ((flatroll_ref - min(flatroll_ref)) / (max(flatroll_ref) - min(flatroll_ref))).reshape(
+        len(flatroll_ref), )
+    ax = fig.add_subplot(1, 2, 1)
+    ax.scatter(x=flatroll_data.T[0], y=flatroll_data.T[1], s=3, c=color_code, cmap='hsv')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_title('Flatroll in 2D')
+    ax = fig.add_subplot(1, 2, 2)
+    ax.scatter(x=flatroll_ref.reshape(len(flatroll_ref)), y=flatroll_lle.T, s=3, c=color_code, cmap='hsv')
+    ax.set_xlabel('flatroll_ref')
+    ax.set_ylabel('flatroll_lle')
+    ax.set_title('Flatroll in 1D')
+
 
 
 
@@ -310,7 +405,7 @@ def plot_8(flatroll_data, flatroll_ref, flatroll_lle, k):
     ax.set_xlabel('flattroll_ref')
     ax.set_ylabel('X2')
 
-    ax.set_title('Flatroll in 1D')  # I think this should be a line. (correct)
+    ax.set_title('Flatroll in 1D')
 
 #assignment 8
 def flatroll_lle():
@@ -325,7 +420,7 @@ def flatroll_lle():
     flatroll_ref = flatroll['true_embedding'].T
 
     # apply LLE
-    flatroll_lle = lle(flatroll_data, 1, 0.00001, 'knn', k=7)
+    flatroll_lle = imp.lle(flatroll_data, 1, 0.00001, 'knn', k=7)
 
     # plot
     plot_8(flatroll_data, flatroll_ref, flatroll_lle, 7)
@@ -337,6 +432,6 @@ def flatroll_lle():
 
     for idx, sigma in enumerate(sigmas):
         flatroll_data_noise = sigma * np.random.randn(length, width) + flatroll_data
-        flatroll_lle = lle(flatroll_data_noise, 1, 1e-6, 'knn', k=k[idx])
+        flatroll_lle = imp.lle(flatroll_data_noise, 1, 1e-6, 'knn', k=k[idx])
         plot_8(flatroll_data_noise, flatroll_ref, flatroll_lle, k[idx])
 
