@@ -18,7 +18,12 @@ Write your implementations in the given functions stubs!
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.csgraph import connected_components
-
+import os
+import scipy.linalg as la
+import scipy.spatial as sp
+from scipy.linalg import expm
+import matplotlib.gridspec as gridspec
+import scipy.io as sio
 
 
 class PCA():
