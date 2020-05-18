@@ -20,6 +20,12 @@ import implementation.py as imp
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib
 from matplotlib import pyplot as plt
+import matplotlib.gridspec as gridspec
+import scipy.io as sio
+import os
+import scipy.linalg as la
+import scipy.spatial as sp
+from scipy.linalg import expm
 
 imp = reload(imp)
 
@@ -349,7 +355,7 @@ def lle_visualize():
 
     # FLATROLL
     # apply lle
-    flatroll_lle = imp.lle(flatroll_data, 1, 0.00001, 'knn', k=7)
+    flatroll_lle = imp.lle(flatroll_data, 1, 0.00001, 'knn', k=9)
 
     # plot
     fig = plt.figure(figsize=(18, 8))
@@ -375,6 +381,9 @@ ASSIGNMENT 8 - FLATROLL LLE
 """
 #knn plot function used later on
 def plot_knn(X, k):
+    """
+    Generates a neighborhood graph from a 2D data set
+    """
     D = np.sqrt(np.sum((X[None, :] - X[:, None])**2, -1))
     kn = np.argsort(D,kind='mergesort')
     # identify k-nearest neighbors
@@ -418,12 +427,6 @@ def flatroll_lle():
     flatroll = np.load(path_to_data)
     flatroll_data = flatroll['Xflat'].T
     flatroll_ref = flatroll['true_embedding'].T
-
-    # apply LLE
-    flatroll_lle = imp.lle(flatroll_data, 1, 0.00001, 'knn', k=7)
-
-    # plot
-    plot_8(flatroll_data, flatroll_ref, flatroll_lle, 7)
 
     #add noise
     sigmas = [0.2, 0.2, 1.8, 1.8]

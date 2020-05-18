@@ -18,7 +18,12 @@ Write your implementations in the given functions stubs!
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.csgraph import connected_components
-
+import os
+import scipy.linalg as la
+import scipy.spatial as sp
+from scipy.linalg import expm
+import matplotlib.gridspec as gridspec
+import scipy.io as sio
 
 
 class PCA():
@@ -196,7 +201,7 @@ def lle(X, m, tol, n_rule, k=None, epsilon=None):
     eigen_kn = np.argsort(abs(eigen_values), kind='mergesort').reshape(len(X), 1)
     # sort eigenvectors by eigenvalues, eigenvector along columns, first eigenvector -> [:,0]
     V = -1 * np.take_along_axis(eigen_vector.T, eigen_kn,
-                                axis=0)  # CAVEAT: mulitplying by -1 because numpy.eig routine delivers wrong sign
+                                axis=0).T  # CAVEAT: mulitplying by -1 because numpy.eig routine delivers wrong sign
 
     # 7. embedded dimension
     Y = V[:, 1:m + 1]
