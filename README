@@ -1,6 +1,14 @@
 This repository contains the code and report for the TU Berlin's Machine
-Learning Lab Course Assignment 1 from Klaus-Robert Müller. 
+Learning Lab Course assignments from Klaus-Robert Müller. 
 
+
+Assignment 1:
 The assignment involves the study, implementation and application of algorithms
 for dimension reduction (PCA, LLE), evaluation (AUC) and outlier detection (Gamma
 idx, Kappa idx and others). 
+
+Assignment 2:
+The assignment involves the study, implementation and application of algorithms
+for clustering algorithms. In particular, k-Means, Gaussian MixtureModels, 
+Agglomorative Clustering are investigated.
+
