@@ -115,6 +115,7 @@ def agglo_dendro(kmloss, mergeidx):
     pass
 
 
+
 def norm_pdf(X, mu, C):
     """
     This function computes the probability density function when given a multivariate gaussian distribution as an input.
@@ -126,22 +127,19 @@ def norm_pdf(X, mu, C):
 
     Output:
     y=probability density function (nx1)
+
     """
 
-    var = np.diagonal(C)  # trace of cov matrix is var
+    B = np.linalg.solve(C, (X - mu).T).T
 
-    det = np.linalg.det(C)
+    D = np.einsum('ji,ij->i', (X - mu).T, B) #same as np.dot() then np.diag()
 
-    frac = 1 / ((np.power((2 * np.pi), (X.shape[1] / 2))) * np.sqrt(det))
-
-    exp = np.exp((-1 / 2) * (np.dot((np.square(X - mu)), 1 / (var))))
-
-    y = frac * exp
+    y = np.exp(-0.5 * D) / (np.power((2 * np.pi), X.shape[1] / 2) * (np.linalg.det(C) ** 0.5))
 
     return y
 
 
-def em_gmm(X, k, max_iter=100, init_kmeans=False, tol=0.00001):
+def em_gmm(X, k, max_iter=100, init_kmeans=False, tol=0.00001, converge_tol=0.0001):
     """
     This function applies the EM algorithm for Gaussian Mixture Models.
 
@@ -151,12 +149,13 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, tol=0.00001):
     max_iter = the maximum amount of iterations attempted to find convergence
     init_kmeans = Initialises the EM algorithm using kmeans function, if True. Default is False.
     tol = The tolerance set for the convergence condition
+    converge_tol = Tolerance for the convergence condition (optional)
 
     Outputs:
     pi = probability that a datapoint belongs to a cluster (1xk)
     mu = center points of clusters (kxd)
     sigma = list of k dxd covariance matrices
-    loglik = the loglikehlihood of each datapoint after convergence
+    loglik = the loglikehlihood at each iteration
     """
 
     if init_kmeans == True:
@@ -189,7 +188,10 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, tol=0.00001):
             # nx1                             1x1 X nx1  = nx1
             likelihood = (pi[i] * norm_pdf(X, mu[i], sigma[i]))  # norm_pdf written to handle mu=(1xd) only
             likelihoods.T[i] = likelihood
-        print('New likelihoods\n', likelihoods)
+
+        # CALC LOGLIK
+        loglik = np.log(np.sum(likelihoods, axis=1)).sum()
+        print('Loglikelihood\n', loglik)
 
         # 2.2 use likelihoods to calculate individual k responsibilities
         # nxk            nxk              nx1
@@ -206,16 +208,19 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, tol=0.00001):
         sigma = np.sum(responsibilities[:, :, None, None] * (X[:, None, :, None] - mu[None, :, :, None]) * (
                     X[:, None, None, :] - mu[None, :, None, :]), axis=0) / n[:, None, None]
         #   (nx0xdx0-nxkx0x0)-->(nxkxdx0)
+        # add regularisation term, tol
+        sigma = sigma + tol * np.eye(X.shape[1])
 
-        # break condition
-        if (old_likelihoods - likelihoods).all() < tol:
-            converged = True
+        # break condition - only runs from second iteration to prevent log of old_likelihoods, which is 0 in iteration 1
+        if iteration > 1:
+            if (np.log(np.sum(old_likelihoods, axis=1)).sum() - loglik).all() < converge_tol:
+                converged = True
 
         iteration = iteration + 1
 
     # return as a list of covariances
     list_sigma = [sigma[i, :, :] for i in range(k)]
-    return pi, mu, list_sigma, likelihoods
+    return pi, mu, list_sigma, loglik
 
 
 def plot_gmm_solution(X, mu, sigma):
