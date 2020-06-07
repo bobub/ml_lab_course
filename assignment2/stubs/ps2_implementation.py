@@ -27,7 +27,6 @@ import copy
 import random
 
 
-# ASSIGNMENT 1: LEO'S
 def kmeans(X, k, max_iter=100):
     """ Performs k-means clustering
 
@@ -97,11 +96,44 @@ def kmeans_agglo(X, r):
         Output:
         value: scalar for sum of euclidean distances to cluster centers
         """
+        # calculate init centroids
+        w_q = np.array([np.sum(X[r == j], axis=0) / (np.sum(r == j)) for j in np.unique(r)])
+        # compute initial clustering cost
+        loss = np.sum(
+            [np.sum((X[r == j, :] - w_q.T[:, np.unique(r) == j].reshape(len(w_q.T))) ** 2) for j in np.unique(r)])
+        return loss
 
-        pass
-    
-    pass
+    # initialization
+    k = len(np.unique(r))
+    n, d = np.shape(X)
+    R = np.zeros((k - 1, n))
+    kmloss = np.zeros((k, 1))
+    mergeidx = np.zeros((k - 1, 2))
 
+    kmloss[0] = kmeans_crit(X, r)
+
+    for l in range(1, k):
+        R[l - 1] = r
+        # calculate init centroids
+        w_q = np.array([np.sum(X[r == j], axis=0) / (np.sum(r == j)) for j in np.unique(r)])
+        # calculate distance between centroids -> covariance matrix
+        D = np.linalg.norm(w_q[None, :] - w_q[:, None], axis=2)
+        # sort covariance ascending order
+        pairs = list(zip(np.argsort(D, kind='mergesort', axis=None) // len(D),
+                         np.argsort(D, kind='mergesort', axis=None) % len(D)))  # zeile / spalte
+        # determine centroid pair with smallest loss, Caveat first elements are 0 explain the diagonal of the cov-matrix
+        min_pair_idx = pairs[k - l + 1]
+        # get names of merged clusters by r (clusters used before have the highest index plus 1 )
+        min_pair = np.unique(r)[np.array(min_pair_idx)]
+        mergeidx[l - 1] = min_pair
+        # if np.isin(mergeidx[l-1, 0], mergeidx[:l-1]):
+        #    mergeidx[l-1, 0] = k+l-1
+
+        # new cluster membership
+        r[np.isin(r, min_pair)] = k + l - 1
+        # new kmloss
+        kmloss[l] = kmeans_crit(X, r)
+    return R, kmloss, mergeidx
 
 
 def agglo_dendro(kmloss, mergeidx):
@@ -111,8 +143,19 @@ def agglo_dendro(kmloss, mergeidx):
     kmloss: vector with loss after each step
     mergeidx: (k-1) x 2 matrix that contains merge idx for each step
     """
+    fourth_column = 2 * np.ones((len(mergeidx), 1))  # necessary for dendogram function, sample count
+    Z = np.concatenate([mergeidx, kmloss[1:], fourth_column], axis=1)
 
-    pass
+    plt.figure(figsize=(25, 10))
+    plt.title('Hierarchical Clustering Dendrogram')
+    plt.xlabel('sample index')
+    plt.ylabel('distance')
+    dendrogram(
+        Z,
+        leaf_rotation=90.,  # rotates the x axis labels
+        leaf_font_size=8.,  # font size for the x axis labels
+    )
+    return
 
 
 
@@ -249,3 +292,5 @@ def plot_gmm_solution(X, mu, sigma):
         plt.plot(mu[i][0] + ellipse[0, :], mu[i][1] + ellipse[1, :], linewidth=4)
         # plot centre points
         plt.scatter(mu[i][0], mu[i][1], c='r', marker='x')
+
+
