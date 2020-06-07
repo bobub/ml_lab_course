@@ -18,6 +18,214 @@ from mpl_toolkits.mplot3d import Axes3D
 import implementation
 
 # Assignment 7
+"""
+ASSIGNMENT 7: a few functions were edited for the purposes of this assignment. 
+"""
+def plot_gmm_solution_7(X,mu,sigma):
+    """
+    This function plots the different gaussians found by the EM algorithm as ellipses centred around the distributions' means.
+    
+    Input:
+    X=data (nxd)
+    mu=distribution centres (kxd)
+    sigma=list of k dxd covariance matrices
+    
+    """
+    #plot data points and setup plot parameters
+    #plt.figure(figsize=(10,10))
+    plt.scatter(X.T[0],X.T[1],s=20)
+    plt.title('GMM solution found by EM algorithm with k = {}'.format(len(mu)))
+    plt.ylabel('X2')
+    plt.xlabel('X1')
+    plt.grid(True)
+
+
+    #draw ellipse
+    for i,sig in enumerate(sigma):
+        tline = np.linspace(0, 2 * np.pi, 100)
+        sphere = np.vstack((np.sin([tline]), np.cos([tline])))
+        ellipse = sqrtm(sig).dot(sphere)
+        plt.plot(mu[i][0] + ellipse[0, :], mu[i][1] + ellipse[1, :],linewidth=4, color = 'k')
+        #plot centre points
+        plt.scatter(mu[i][0],mu[i][1],c='r',marker='x')
+def em_gmm_7(X, k, max_iter=100, init_kmeans=False, tol=0.00001, converge_tol=0.0001):
+    """
+    This function applies the EM algorithm for Gaussian Mixture Models.
+    It's adapted to investigate the quality as it has an extra output - iteration
+
+    Inputs:
+    X = data (nxd)
+    k = number of gaussian components
+    max_iter = the maximum amount of iterations attempted to find convergence
+    init_kmeans = Initialises the EM algorithm using kmeans function, if True. Default is False.
+    tol = The tolerance set for the convergence condition
+    converge_tol = Tolerance for the convergence condition (optional)
+
+    Outputs:
+    pi = probability that a datapoint belongs to a cluster (1xk)
+    mu = center points of clusters (kxd)
+    sigma = list of k dxd covariance matrices
+    loglik = the loglikehlihood at each iteration
+    iteration = number of iterations until convergence
+    """
+
+    if init_kmeans == True:
+        # 1.a INIT_KMEANS
+        mu, r, _ = kmeans(X, k)
+        unique, counts = np.unique(r, return_counts=True)
+        pi = counts / np.sum(counts)
+
+    else:
+        # 1.b RANDOM INITIALISATIONS
+        pi = np.full(shape=(k, 1), fill_value=1 / k)  # kx1
+        rand_samples = np.random.choice(X.shape[0], size=(k,), replace=False)  # choose k random data points
+        mu = X[rand_samples]  # centroid initialisation as random points, kxd
+
+    # setup storage and loop
+    sigma = [np.eye(X.shape[1]) for i in range(k)]  # dxd
+    likelihoods = np.zeros(shape=(X.shape[0], k), dtype=float)  # nxk
+    converged = False
+    iteration = 1
+    while (not converged) & (iteration <= max_iter):
+
+        print('Iteration Number:\n', iteration)
+
+        # 2. E-STEP - compute new likelihoods and responsibilities
+        old_likelihoods = copy.deepcopy(likelihoods)
+        # print('Old likelihoods\n', old_likelihoods)
+
+        # 2.1 first find all k likelihoods
+        for i in range(k):
+            # nx1                             1x1 X nx1  = nx1
+            likelihood = (pi[i] * norm_pdf(X, mu[i], sigma[i]))  # norm_pdf written to handle mu=(1xd) only
+            likelihoods.T[i] = likelihood
+
+        # CALC LOGLIK
+        loglik = np.log(np.sum(likelihoods, axis=1)).sum()
+        print('Loglikelihood\n', loglik)
+
+        # 2.2 use likelihoods to calculate individual k responsibilities
+        # nxk            nxk              nx1
+        responsibilities = likelihoods / np.sum(likelihoods, axis=1).reshape(likelihoods.shape[0], 1)
+
+        # 3. M-STEP - compute new n,pi,mu,sigma
+        # 1xk
+        n = np.sum(responsibilities, axis=0)
+        # 1xk
+        pi = n / np.sum(n, axis=0)
+        # kxd                    (nxkx0)x(nx0xd)=nxkxd --> kxd / kx1
+        mu = np.sum(responsibilities[:, :, None] * X[:, None, :], axis=0) / n.reshape(n.shape[0], 1)
+        # kxdxd         =  sum ((nxkx0x0)     x    (nxkxdx0)x(nxkx0xd)) = nxkxdxd-->kxdxd/kx0x0
+        sigma = np.sum(responsibilities[:, :, None, None] * (X[:, None, :, None] - mu[None, :, :, None]) * (
+                    X[:, None, None, :] - mu[None, :, None, :]), axis=0) / n[:, None, None]
+        #   (nx0xdx0-nxkx0x0)-->(nxkxdx0)
+        # add regularisation term, tol
+        sigma = sigma + tol * np.eye(X.shape[1])
+
+        # break condition - only runs from second iteration to prevent log of old_likelihoods, which is 0 in iteration 1
+        if iteration > 1:
+            if (np.log(np.sum(old_likelihoods, axis=1)).sum() - loglik).all() < converge_tol:
+                converged = True
+
+        iteration = iteration + 1
+
+    # return as a list of covariances
+    list_sigma = [sigma[i, :, :] for i in range(k)]
+    return pi, mu, list_sigma, loglik, iteration
+def CCR(true_mean, data, function = 'k-means',iteration = 100):
+    tp = 0
+    fp = 0
+    if np.isin(function, ['GMM','GMM_kmean_init']):
+        iter_ = np.zeros(iteration)
+    for i in range(iteration):
+        if function == 'k-means':
+            mu, r, loss = kmeans(X = data, k = 5)
+        elif function == 'GMM':
+            pi, mu, list_sigma, likelihoods, iter_[i] = em_gmm_7(X = data, k = 5)
+        elif function == 'GMM_kmean_init':
+            pi, mu, list_sigma, likelihoods, iter_[i] = em_gmm_7(X = data, k = 5, init_kmeans = True)
+  
+        for i in range(5):
+            if (np.linalg.norm(true_mean[i]-mu, axis = 1)<0.1).any():
+                tp+= 1
+            else:
+                fp+= 1
+    try:
+        plt.figure()
+        plt.bar(range(iteration),iter_)
+        plt.ylim(0,100)
+    except:
+        print('k-means is used')
+    CCR = tp / (tp+fp) # correct precision rate
+    print('CCR is: {}'.format(CCR))
+    return CCR
+    
+def assignment_7():
+    
+    # load data 
+    cwd = os.getcwd()
+    file_name = '5_gaussians.npy'
+    path_to_data = cwd + '/data/'+file_name
+    assert os.path.exists(path_to_data), "The path does not excist."
+    gaussians = np.load(path_to_data).T
+    
+    # Visualize data
+    plt.scatter(gaussians.T[0], gaussians.T[1])
+    
+    # k-means on 5 gaussian data sets
+    fig = plt.figure(figsize=(16, 9))
+    gs = fig.add_gridspec(2, 3)
+    for k in range(2,8):
+        mu, r, loss = kmeans(X = gaussians, k = k)
+        f_ax1 = fig.add_subplot(gs[int(k>=5), (k-2)%3])
+        plt.title('k-means solution with k = {}'.format(len(mu)))
+        plt.ylabel('X2')
+        plt.xlabel('X1')
+        plt.scatter(gaussians.T[0], gaussians.T[1])
+        plt.scatter (mu.T[0], mu.T[1])
+    
+    # GMM on 5 gaussian data sets - without k-means initialization
+    fig = plt.figure(figsize=(16, 9))
+    gs = fig.add_gridspec(2, 3)
+    for k in range(2,8):
+        pi, mu, list_sigma, likelihoods = em_gmm(X = gaussians, k = k)
+        f_ax1 = fig.add_subplot(gs[int(k>=5), (k-2)%3])
+        plot_gmm_solution_7(X = gaussians ,mu = mu, sigma = list_sigma)
+        
+    # GMM on 5 gaussian data sets - with k-means initialization
+    fig = plt.figure(figsize=(16, 9))
+    gs = fig.add_gridspec(2, 3)
+    for k in range(2,8):
+        pi, mu, list_sigma, likelihoods = em_gmm(X = gaussians, k = k, init_kmeans = True)
+        fig.add_subplot(2, 3, k-1) 
+        plot_gmm_solution_7(X = gaussians ,mu = mu, sigma = list_sigma)
+        
+    # dendogram
+    mu, r, loss =  kmeans(gaussians,15)
+    R, kmloss, mergeidx = kmeans_agglo(gaussians,r)
+    agglo_dendro(kmloss, mergeidx)
+    # visualization of k=5 centroids found by hierachical clustering
+    fig = plt.figure(figsize=(16, 9))
+    for i in [2,3,4]:
+        r = R[-i]
+        mu = np.array([np.sum(gaussians[r == j], axis = 0) / (np.sum(r == j)) for j in np.unique(r)])
+        plt.subplot(1,3,i-1)
+        plt.title('k = {}'.format(len(mu)))
+        plt.ylabel('X2')
+        plt.xlabel('X1')
+        plt.scatter(gaussians.T[0], gaussians.T[1])
+        plt.scatter (mu.T[0], mu.T[1])
+    
+    # interpret quality of k-means, GMM, GMM_km
+    true_mean = np.vstack((np.mean(gaussians[:100], axis = 0),np.mean(gaussians[100:200], axis = 0),np.mean(gaussians[200:300], axis = 0), np.mean(gaussians[300:400], axis = 0),np.mean(gaussians[400:], axis = 0)))
+    # CCR 
+    # k-means
+    CCR_km = CCR(true_mean, gaussians, function = 'k-means')
+    # GMM
+    CCR_GMM = CCR(true_mean, gaussians, function = 'GMM')
+    # GMM_km
+    CCR_GMM_km = CCR(true_mean, gaussians, function = 'GMM_kmean_init')
+
 
 # Assignment 8
 def assignment_8():
@@ -75,6 +283,73 @@ def assignment_8():
 
 
 #Assignment 9
+def centroid_visualization(mu, title = 'plot'):
+    """
+    This function visualizes the centorids found in the usps data set, which contains images of size 16x16.
+    The maximum number of centroids that can be visualized is 10.
+
+    Inputs:
+    mu = centroids of size 256x1
+    title = title of the image
+    
+    Outputs:
+    A figure containing 10 digits.
+    """
+    # results / Centroids Visualization of k-means 
+    fig = plt.figure(figsize=(4, 9))
+    plt.title(str(title))
+    gs = fig.add_gridspec(5, 2)
+    for i in range(len(mu)):
+        f_ax1 = fig.add_subplot(gs[i%5,int(i>=5)])
+        plt.imshow(mu[i].reshape(16,16), cmap = 'gray')
+
+def assignment_9():
+    # Load data
+    cwd = os.getcwd()
+    file_name = 'usps.mat'
+    path_to_data = cwd + '/data/' + file_name
+    assert os.path.exists(path_to_data), "The path to the data does not exist."
+    data = sio.loadmat(path_to_data)
+    data_labels = data['data_labels']
+    usps_data = data['data_patterns'].T
+    kn = 10
+    
+    # k-means on 5 usps data sets
+    mu, r, loss = kmeans(X = usps_data, k = kn)
+    print('Centroids: ' + str(mu))
+    centroid_visualization(mu, title = 'k-means')
+    
+    # GMM on 5 gaussian data sets - without k-means initialization
+    pi, mu, list_sigma, likelihoods = em_gmm(X = usps_data[:1000], k = kn, tol = 0.05, max_iter = 40)
+    print('Centroids: ' + str(mu))
+    centroid_visualization(mu, title = 'GMM')
+    
+    # GMM on 5 gaussian data sets - with k-means initialization
+    pi, mu, list_sigma, likelihoods = em_gmm(X = usps_data[:1000], k = kn,init_kmeans = True, tol=0.05, max_iter = 10)
+    print('Centroids: ' + str(mu))
+    centroid_visualization(mu, title = 'GMM_km')
+    
+    # dendogram of hierarchical clustering with 20 starting clusters
+    kn = 20
+    # k-means on 5 usps data sets
+    mu, r, loss = kmeans(X = usps_data, k = kn)
+    # hierarchical clustering starting from kmean results
+    R, kmloss, mergeidx = kmeans_agglo(usps_data,r)
+    # plot dendrogram
+    agglo_dendro(kmloss, mergeidx)
+    
+    # Visualization of the centroids found by the hierarchical agglomerative clustering for every iteration step
+    # Merged clusters of the previous iteration is the last element of every column
+    fig = plt.figure(figsize=(16, 16))
+    gs = fig.add_gridspec(len(R)+1, len(R))
+    for i, r in enumerate(R):
+        # calculate init centroids
+        w_q = np.array([np.sum(usps_data[r == j], axis = 0) / (np.sum(r == j)) for j in np.unique(r)])
+        for j, mu in enumerate(w_q):
+            f_ax1 = fig.add_subplot(gs[j,i])
+            plt.imshow(mu.reshape(16,16), cmap = 'gray')
+            if (i > 0 and j == 0):
+                plt.title('iter: {}'.format(i))
 
 
 #Assignment 10
