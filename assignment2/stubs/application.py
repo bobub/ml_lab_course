@@ -15,7 +15,7 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
-import implementation
+import ps2_implementation.py
 
 # Assignment 7
 """
