@@ -325,7 +325,7 @@ def assignment_9():
     centroid_visualization(mu, title = 'GMM')
     
     # GMM on 5 gaussian data sets - with k-means initialization
-    pi, mu, list_sigma, likelihoods = em_gmm(X = usps_data[:1000], k = kn,init_kmeans = True, tol=0.05, max_iter = 10)
+    pi, mu, list_sigma, likelihoods = em_gmm(X = usps_data[:1000], k = kn,init_kmeans = True, tol=0.05, max_iter = 40)
     print('Centroids: ' + str(mu))
     centroid_visualization(mu, title = 'GMM_km')
     
