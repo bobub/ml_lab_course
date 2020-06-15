@@ -15,7 +15,7 @@ import numpy as np
 import scipy.linalg as la
 import pylab as pl
 
-import sheet2 as imp
+import ps2_implementation as imp
 
 class TestSheet2(unittest.TestCase):
     X = np.array([[0., 1., 1., 10., 10.25, 11., 10., 10.25, 11.],
