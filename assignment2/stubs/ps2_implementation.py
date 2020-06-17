@@ -72,7 +72,10 @@ def kmeans(X, k, max_iter=100):
         iteration += 1
     return w_q.T, m_q, loss
 
-
+#NOTE:
+# this agglo function produces the correct result but is incompatible with the test function
+# the design of this agglo funcion overwrites the r variable, which causes the test to fail
+# see last 5 lines of function
 def kmeans_agglo(X, r):
     """ Performs agglomerative clustering with k-means criterion
 
