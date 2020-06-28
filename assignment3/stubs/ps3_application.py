@@ -42,7 +42,7 @@ class assignment3():
         # load data 
         cwd = os.getcwd()
         file_name = 'qm7.mat'
-        path_to_data = os.path.dirname(cwd) + '/data/'+file_name
+        path_to_data = cwd + '/data/' + xtrain + '/data/'+file_name
         assert os.path.exists(path_to_data), "The path does not excist."
         data = sio.loadmat(path_to_data)
         data_X = data['X'] # of shape 7165x23x23 
