@@ -42,7 +42,7 @@ class assignment3():
         # load data 
         cwd = os.getcwd()
         file_name = 'qm7.mat'
-        path_to_data = cwd + '/data/' + xtrain + '/data/'+file_name
+        path_to_data = cwd + '/data/' + file_name
         assert os.path.exists(path_to_data), "The path does not excist."
         data = sio.loadmat(path_to_data)
         data_X = data['X'] # of shape 7165x23x23 
@@ -291,7 +291,7 @@ def assignment_4():
         print('Xtest\n', xtest.shape)
         print('ytest\n', ytest.shape)
 
-        cvkrr = cv(xtrain.T, ytrain, krr, params, loss_function=zero_one_loss, nfolds=fold, nrepetitions=5)
+        cvkrr = imp.cv(xtrain.T, ytrain, imp.krr, params, loss_function=zero_one_loss, nfolds=fold, nrepetitions=5)
         y_pred = cvkrr.predict(xtest.T)
 
         results[dataset]['y_pred'] = y_pred
@@ -309,7 +309,7 @@ def assignment_4():
         print('Xtest\n', xtest.shape)
         print('ytest\n', ytest.shape)
 
-        cvkrr = cv(xtrain.T, ytrain, krr, params, loss_function=zero_one_loss, nfolds=fold, nrepetitions=5)
+        cvkrr = imp.cv(xtrain.T, ytrain, imp.krr, params, loss_function=zero_one_loss, nfolds=fold, nrepetitions=5)
         y_pred = cvkrr.predict(xtest.T)
 
         if results[dataset]['cvloss'] > cvkrr.cvloss:
@@ -341,7 +341,7 @@ def assignment_4():
                   'kernelparameter': [(results[dataset]['kernelparameter'])],
                   'regularization': [(results[dataset]['regularization'])]}
         # print(params['kernel'])
-        cvkrr = cv(xtrain.T, ytrain, krr, params, loss_function=roc_fun, nfolds=fold, nrepetitions=4)
+        cvkrr = imp.cv(xtrain.T, ytrain, imp.krr, params, loss_function=roc_fun, nfolds=fold, nrepetitions=4)
 
         loss = cvkrr.cvloss
         # print('fpr\n',loss[0])
@@ -376,7 +376,7 @@ def assignment_4():
         params = {'kernel': [results[dataset]['kernel']], 'kernelparameter': [results[dataset]['kernelparameter']],
                   'regularization': np.logspace(-5, 5, 11)}
 
-        cvkrr = cv(xtrain.T, ytrain, krr, params, loss_function=zero_one_loss, nfolds=fold, nrepetitions=5)
+        cvkrr = imp.cv(xtrain.T, ytrain, imp.krr, params, loss_function=zero_one_loss, nfolds=fold, nrepetitions=5)
         y_pred = cvkrr.predict(xtest.T)
 
         cv_regularisation.append(cvkrr.cvloss)
