@@ -12,3 +12,10 @@ The assignment involves the study, implementation and application of algorithms
 for clustering algorithms. In particular, k-Means, Gaussian MixtureModels, 
 Agglomorative Clustering are investigated.
 
+Assignment 3:
+The assignment involves the study, implementation and application of algorithms
+for cross validation and kernel ridge regression. These classes are then used to
+reproduce the results of a research paper and investigate 5 different
+classification datasets.
+
+
