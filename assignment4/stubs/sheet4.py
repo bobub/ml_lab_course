@@ -88,9 +88,43 @@ class svm_sklearn():
         return self.clf.decision_function(X)
 
 
+# Assignment 2
+
 def plot_boundary_2d(X, y, model):
-    # INSERT CODE
-    pass
+    """
+    Plots a 2 dimensional boundary of a model.
+
+    Inputs:
+    X = 2d data array (nx2)
+    y = labels (nx1)
+    model = model (typically SVM or neural net)
+    """
+    # 1. plot points X
+    plt.scatter(X.T[0][np.argwhere(y == 1)], X.T[1][np.argwhere(y == 1)], c='b', label='Positive class')
+    plt.scatter(X.T[0][np.argwhere(y == -1)], X.T[1][np.argwhere(y == -1)], c='r', label='Negative class')
+
+    # 2. mark support vectors with a cross if svm
+    if isinstance(model, svm_sklearn):
+        plt.scatter(model.X_sv.T[0], model.X_sv.T[1], s=80, c='y', marker='x', label='Support vectors')
+
+    # 3. plot separating hyperplane
+    # 3a. create grid of predictions
+    x_max = np.amax(X, axis=0)
+    x_min = np.amin(X, axis=0)
+    x0 = np.linspace(x_min[0], x_max[0], 50)
+    x1 = np.linspace(x_min[1], x_max[1], 50)
+    x0v, x1v = np.meshgrid(x0, x1)
+    Xv = np.squeeze(np.array((x0v.reshape(2500, 1), x1v.reshape(2500, 1))))
+    grid_pred = model.predict(Xv.T)
+    # 3b plot level 0 contour line
+    plt.contour(x0, x1, grid_pred.reshape(50, 50), levels=0)
+
+    # format plot
+    plt.ylabel('X1')
+    plt.xlabel('X0')
+    plt.title('2D visualisation of model classifications with a separating hyperplane')
+    plt.legend()
+    plt.show()
 
 
 def sqdistmat(X, Y=False):
@@ -122,7 +156,6 @@ def buildKernel(X, Y=False, kernel='linear', kernelparameter=0):
 
 
 # provided stub
-
 class neural_network():
     def __init__(self, layers=[2, 100, 2], scale=.1, p=.1, lr=.1, lam=.1):
         super().__init__()
