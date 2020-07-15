@@ -17,14 +17,17 @@ Write your implementations in the given functions stubs!
 import scipy.linalg as la
 import matplotlib.pyplot as plt
 import sklearn.svm
-from cvxopt.solvers import qp
+from cvxopt.solvers import qp, options
 from cvxopt import matrix as cvxmatrix
 import numpy as np
 import torch
 
+
+
 class svm_qp():
     """ Support Vector Machines via Quadratic Programming """
-
+    options['show_progress'] = False
+    
     def __init__(self, kernel='linear', kernelparameter=1., C=1.):
         self.kernel = kernel
         self.kernelparameter = kernelparameter
@@ -33,6 +36,7 @@ class svm_qp():
         self.b = None
         self.X_sv = None
         self.Y_sv = None
+        
     
     def fit(self, X, Y):
 
@@ -46,6 +50,46 @@ class svm_qp():
         #A =   # hint: this has to be a row vector
         #b =   # hint: this has to be a scalar
         
+        self.X_sv = X.T
+        self.Y_sv = Y
+        self.__ydim = Y.shape[0]
+        
+        # reshape ytrain
+        self.Y_sv = self.Y_sv.reshape(self.__ydim,-1)
+
+        
+        # calculate kernelmatrix
+        #if self.kernel == 'linear':
+        #    self.__linearKernel(X)
+        #elif self.kernel == 'polynomial':
+        #    self.__polynomialKernel(X)
+        #elif self.kernel == 'gaussian':
+        #    self.__gaussianKernel(X)
+        #else:
+        # print("""The following kernel {} is not known. Please use either 'linear' , 'polynomial' or 'gaussian'.""".format(kernel))
+
+        self.kernelmatrix = buildKernel(self.X_sv, kernel = self.kernel, kernelparameter = self.kernelparameter)
+        
+        P = (self.Y_sv@self.Y_sv.T)*self.kernelmatrix
+        q = -1*np.ones((self.__ydim,1)) #y_train has the same length as X_train
+        A = self.Y_sv.T
+        b = 0
+        if self.C is None: 
+            # constraint for evrry every alpha: 0 =< alpha
+            # use matrix notation
+            # QP solver wants it: Gx =< h, where h expresses the 0 of the condition
+            # to foollow the QP_solver formulation contraint in G expressed by -1
+            G = -1*np.identity(self.__ydim)
+            h = np.zeros(self.__ydim)
+        else:
+            # constraint for every alpha: 0 =< alpha =< C
+            # use matrix notation
+            # QP solver wants it: Gx =< h, hence h expresses the upper and lower bound of the condition -> h_size = 2n x 1
+            # G of size 2n x n 
+            # first n rows contain the constraint 0 =< alpha -> in G expressed by -1, in h with 0
+            # second n rows contain the constraint alpha =< C -> in G expressed by 1, in h with C
+            G = np.vstack((-1*np.identity(self.__ydim),np.identity(self.__ydim)))
+            h = np.hstack((np.zeros(self.__ydim),self.C/self.__ydim*np.ones(self.__ydim)))
         # this is already implemented so you don't have to
         # read throught the cvxopt manual
         alpha = np.array(qp(cvxmatrix(P, tc='d'),
@@ -54,14 +98,63 @@ class svm_qp():
                             cvxmatrix(h, tc='d'),
                             cvxmatrix(A, tc='d'),
                             cvxmatrix(b, tc='d'))['x']).flatten()
-
-        #b = 
-
+        # Support vectors have non zero lagrange multipliers and are smaller than C/m
+        self.sv = np.logical_and(alpha > 1e-8, alpha < np.round(self.C/self.__ydim,5)) #treshold 1e-5
+        self.alpha_sv = alpha[self.sv]
+        
+        self.X_sv = self.X_sv[:,self.sv]
+        self.Y_sv = self.Y_sv[self.sv]
+        # calculation of bias b
+        
+        # calculate kernelmatrix for X_sv, makes it independet of the choosen kernel
+        
+        #if self.kernel == 'linear':
+        #    self.__linearKernel(self.X_sv)
+        #elif self.kernel == 'polynomial':
+        #    self.__polynomialKernel(self.X_sv)
+        #elif self.kernel == 'gaussian':
+        #    self.__gaussianKernel(self.X_sv)
+        self.kernelmatrix = buildKernel(self.X_sv, kernel = self.kernel, kernelparameter = self.kernelparameter)
+        
+        # b = mean(y[sv] - sum(alpha*y*kernel(X_tr,X[sv]))
+        # w is expressed by sum alpha*y*X_tr , usually it would be multiplied with X[sv].T for linear kernels
+        # but because different kernels can be used, the kernel way is used 
+        
+        # for all data points
+        #self.b = np.mean(self.Y_sv-(alpha.reshape(-1,1)*self.__ytrain).T@self.kernelmatrix)
+        
+        # use only sv 
+        self.b = np.mean(self.Y_sv-(self.alpha_sv.reshape(-1,1)*self.Y_sv).T@(self.kernelmatrix))
+        
     def predict(self, X):
 
         # INSERT_CODE
+        
+        # calculate kernelmatrix
+        #if self.kernel == 'linear':
+        #    self.__linearKernel(X)
+        #elif self.kernel == 'polynomial':
+        #    self.__polynomialKernel(X)
+        #elif self.kernel == 'gaussian':
+        #    self.__gaussianKernel(X)
 
-        return self
+        self.kernelmatrix = buildKernel(self.X_sv,X.T, kernel = self.kernel, kernelparameter = self.kernelparameter)
+        self.yhat = np.sign((self.alpha_sv.reshape(-1,1)*self.Y_sv).T @ self.kernelmatrix + self.b)
+
+        return self.yhat
+    
+    def __linearKernel(self, Y):
+        self.kernelmatrix = self.X_sv.dot(Y.T)
+
+    def __polynomialKernel(self, Y):
+        self.kernelmatrix = (self.X_sv.dot(Y.T) + 1) ** self.kernelparameter
+
+    def __gaussianKernel(self, Y):
+        X_len, X_width = self.X_sv.shape
+        self.kernelmatrix = np.exp(-(
+                    np.diagonal(self.X_sv.dot(self.X_sv.T)).reshape(X_len, 1) - 2 * self.X_sv.dot(
+                Y.T) + np.diagonal(Y.dot(Y.T))) / (2 * (self.kernelparameter ** 2)))
+
 
 
 # This is already implemented for your convenience
@@ -86,8 +179,42 @@ class svm_sklearn():
 
 
 def plot_boundary_2d(X, y, model):
-    # INSERT CODE
-    pass
+    """
+    Plots a 2 dimensional boundary of a model.
+
+    Inputs:
+    X = 2d data array (nx2)
+    y = labels (nx1)
+    model = model (typically SVM or neural net)
+    """
+    # 1. plot points X
+    plt.scatter(X.T[0][np.argwhere(y == 1)], X.T[1][np.argwhere(y == 1)], c='b', label='Positive class')
+    plt.scatter(X.T[0][np.argwhere(y == -1)], X.T[1][np.argwhere(y == -1)], c='r', label='Negative class')
+
+    # 2. mark support vectors with a cross if svm
+    if isinstance(model, svm_sklearn):
+        plt.scatter(model.X_sv.T[0], model.X_sv.T[1], s=80, c='y', marker='x', label='Support vectors')
+
+    # 3. plot separating hyperplane
+    # 3a. create grid of predictions
+    x_max = np.amax(X, axis=0)
+    x_min = np.amin(X, axis=0)
+    x0 = np.linspace(x_min[0], x_max[0], 50)
+    x1 = np.linspace(x_min[1], x_max[1], 50)
+    x0v, x1v = np.meshgrid(x0, x1)
+    Xv = np.squeeze(np.array((x0v.reshape(2500, 1), x1v.reshape(2500, 1))))
+    grid_pred = model.predict(Xv.T)
+    # 3b plot level 0 contour line
+    plt.contour(x0, x1, grid_pred.reshape(50, 50), levels=0)
+
+    # format plot
+    plt.ylabel('X1')
+    plt.xlabel('X0')
+    plt.title('2D visualisation of model classifications with a separating hyperplane')
+    plt.legend()
+    plt.show()
+
+
 
 
 def sqdistmat(X, Y=False):
@@ -103,7 +230,7 @@ def sqdistmat(X, Y=False):
 
 def buildKernel(X, Y=False, kernel='linear', kernelparameter=0):
     d, n = X.shape
-    if Y.isinstance(bool) and Y is False:
+    if isinstance(Y,bool) and Y is False:
         Y = X
     if kernel == 'linear':
         K = np.dot(X.T, Y)
@@ -117,11 +244,14 @@ def buildKernel(X, Y=False, kernel='linear', kernelparameter=0):
         raise Exception('unspecified kernel')
     return K
 
-class neural_network(Module):
-    def __init__(self, layers=[2,100,2], scale=.1, p=None, lr=None, lam=None):
+# provided stub
+
+class neural_network():
+    def __init__(self, layers=[2, 100, 2], scale=.1, p=.1, lr=.1, lam=.1):
         super().__init__()
-        self.weights = ParameterList([Parameter(scale*torch.randn(m, n)) for m, n in zip(layers[:-1], layers[1:])])
-        self.biases = ParameterList([Parameter(scale*torch.randn(n)) for n in layers[1:]])
+        self.weights = tr.nn.ParameterList([tr.nn.Parameter(scale * tr.randn(m, n)) for m, n in zip(layers[:-1], layers[1:])])
+        self.biases = tr.nn.ParameterList([tr.nn.Parameter(scale * tr.randn(n)) for n in layers[1:]])
+        self.parameters = list(self.weights) + list(self.biases)
 
         self.p = p
         self.lr = lr
@@ -129,30 +259,51 @@ class neural_network(Module):
         self.train = False
 
     def relu(self, X, W, b):
-        # YOUR CODE HERE!
-        pass
+        # algorithm 15, pg 46 from guide.pdf
+        if self.train:
+            delta = bernoulli.rvs(1 - self.p,
+                                  size=W.shape[1])  # sample 'out' many samples from Bernoulli distribution B(1-p)
+            Z = tr.from_numpy(delta) * tr.max(tr.zeros(X.shape[0], W.shape[1]), tr.mm(X, W) + b)
 
-    def softmax(self, X, W, b):
-        # YOUR CODE HERE!
-        pass
+        else:
+            Z = tr.max(tr.zeros(X.shape[0], W.shape[1]), (1 - self.p) * tr.mm(X, W) + b)
+
+        return Z
+
+    def softmax(self, Z, W, b):
+        # algorithm 16, pg 46 from guide.pdf
+        Z = tr.mm(Z, W) + b
+        y_hat = tr.div(tr.exp(Z).T, tr.sum(tr.exp(Z), dim=1)).T
+
+        return y_hat
 
     def forward(self, X):
-        X = torch.tensor(X, dtype=torch.float)
-        # YOUR CODE HERE!
-        return X
+        # algorithm 14, pg 45 from guide.pdf
+        X = tr.tensor(X, dtype=tr.float)
+        Z = X
+        # apply ReLU to all layers but the last
+        for w, b in zip(self.weights[:len(self.weights) - 1],
+                        self.biases[:len(self.biases) - 1]):  # iterate through L-1 layers
+            Z = self.relu(Z, w, b)
+        # apply softmax to last layer
+        y_hat = self.softmax(Z, self.weights[len(self.weights) - 1], self.biases[len(self.biases) - 1])
+
+        return y_hat
 
     def predict(self, X):
         return self.forward(X).detach().numpy()
 
     def loss(self, ypred, ytrue):
-        # YOUR CODE HERE!
-        pass
+        # compute cross entropy loss according to pg47 from guide.pdf
+        loss = (-1 / ytrue.shape[0]) * tr.sum(ytrue * tr.log(ypred))
+
+        return loss
 
     def fit(self, X, y, nsteps=1000, bs=100, plot=False):
-        X, y = torch.tensor(X), torch.tensor(y)
-        optimizer = SGD(self.parameters(), lr=self.lr, weight_decay=self.lam)
+        X, y = tr.tensor(X), tr.tensor(y)
+        optimizer = tr.optim.SGD(self.parameters, lr=self.lr, weight_decay=self.lam)
 
-        I = torch.randperm(X.shape[0])
+        I = tr.randperm(X.shape[0])
         n = int(np.ceil(.1 * X.shape[0]))
         Xtrain, ytrain = X[I[:n]], y[I[:n]]
         Xval, yval = X[I[n:]], y[I[n:]]
@@ -160,7 +311,7 @@ class neural_network(Module):
         Ltrain, Lval, Aval = [], [], []
         for i in range(nsteps):
             optimizer.zero_grad()
-            I = torch.randperm(Xtrain.shape[0])[:bs]
+            I = tr.randperm(Xtrain.shape[0])[:bs]
             self.train = True
             output = self.loss(self.forward(Xtrain[I]), ytrain[I])
             self.train = False
