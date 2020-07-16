@@ -50,7 +50,7 @@ class svm_qp():
         #A =   # hint: this has to be a row vector
         #b =   # hint: this has to be a scalar
         
-        self.X_sv = X.T
+        self.X_sv = X
         self.Y_sv = Y
         self.__ydim = Y.shape[0]
         
@@ -68,7 +68,7 @@ class svm_qp():
         #else:
         # print("""The following kernel {} is not known. Please use either 'linear' , 'polynomial' or 'gaussian'.""".format(kernel))
 
-        self.kernelmatrix = buildKernel(self.X_sv, kernel = self.kernel, kernelparameter = self.kernelparameter)
+        self.kernelmatrix = buildKernel(self.X_sv.T, kernel = self.kernel, kernelparameter = self.kernelparameter)
         
         P = (self.Y_sv@self.Y_sv.T)*self.kernelmatrix
         q = -1*np.ones((self.__ydim,1)) #y_train has the same length as X_train
@@ -89,7 +89,7 @@ class svm_qp():
             # first n rows contain the constraint 0 =< alpha -> in G expressed by -1, in h with 0
             # second n rows contain the constraint alpha =< C -> in G expressed by 1, in h with C
             G = np.vstack((-1*np.identity(self.__ydim),np.identity(self.__ydim)))
-            h = np.hstack((np.zeros(self.__ydim),self.C/self.__ydim*np.ones(self.__ydim)))
+            h = np.hstack((np.zeros(self.__ydim),self.C*np.ones(self.__ydim)))
         # this is already implemented so you don't have to
         # read throught the cvxopt manual
         alpha = np.array(qp(cvxmatrix(P, tc='d'),
@@ -99,10 +99,10 @@ class svm_qp():
                             cvxmatrix(A, tc='d'),
                             cvxmatrix(b, tc='d'))['x']).flatten()
         # Support vectors have non zero lagrange multipliers and are smaller than C/m
-        self.sv = np.logical_and(alpha > 1e-8, alpha < np.round(self.C/self.__ydim,5)) #treshold 1e-5
+        self.sv = np.logical_and(alpha > 1e-5, alpha < np.round(self.C,5)) #treshold 1e-5
         self.alpha_sv = alpha[self.sv]
         
-        self.X_sv = self.X_sv[:,self.sv]
+        self.X_sv = self.X_sv[self.sv]
         self.Y_sv = self.Y_sv[self.sv]
         # calculation of bias b
         
@@ -114,7 +114,7 @@ class svm_qp():
         #    self.__polynomialKernel(self.X_sv)
         #elif self.kernel == 'gaussian':
         #    self.__gaussianKernel(self.X_sv)
-        self.kernelmatrix = buildKernel(self.X_sv, kernel = self.kernel, kernelparameter = self.kernelparameter)
+        self.kernelmatrix = buildKernel(self.X_sv.T, kernel = self.kernel, kernelparameter = self.kernelparameter)
         
         # b = mean(y[sv] - sum(alpha*y*kernel(X_tr,X[sv]))
         # w is expressed by sum alpha*y*X_tr , usually it would be multiplied with X[sv].T for linear kernels
@@ -138,7 +138,7 @@ class svm_qp():
         #elif self.kernel == 'gaussian':
         #    self.__gaussianKernel(X)
 
-        self.kernelmatrix = buildKernel(self.X_sv,X.T, kernel = self.kernel, kernelparameter = self.kernelparameter)
+        self.kernelmatrix = buildKernel(self.X_sv.T,X.T, kernel = self.kernel, kernelparameter = self.kernelparameter)
         self.yhat = np.sign((self.alpha_sv.reshape(-1,1)*self.Y_sv).T @ self.kernelmatrix + self.b)
 
         return self.yhat
@@ -192,7 +192,7 @@ def plot_boundary_2d(X, y, model):
     plt.scatter(X.T[0][np.argwhere(y == -1)], X.T[1][np.argwhere(y == -1)], c='r', label='Negative class')
 
     # 2. mark support vectors with a cross if svm
-    if isinstance(model, svm_sklearn):
+    if isinstance(model, svm_qp):
         plt.scatter(model.X_sv.T[0], model.X_sv.T[1], s=80, c='y', marker='x', label='Support vectors')
 
     # 3. plot separating hyperplane
