@@ -58,15 +58,6 @@ class svm_qp():
         self.Y_sv = self.Y_sv.reshape(self.__ydim,-1)
 
         
-        # calculate kernelmatrix
-        #if self.kernel == 'linear':
-        #    self.__linearKernel(X)
-        #elif self.kernel == 'polynomial':
-        #    self.__polynomialKernel(X)
-        #elif self.kernel == 'gaussian':
-        #    self.__gaussianKernel(X)
-        #else:
-        # print("""The following kernel {} is not known. Please use either 'linear' , 'polynomial' or 'gaussian'.""".format(kernel))
 
         self.kernelmatrix = buildKernel(self.X_sv.T, kernel = self.kernel, kernelparameter = self.kernelparameter)
         
@@ -75,6 +66,7 @@ class svm_qp():
         A = self.Y_sv.T
         b = 0
         if self.C is None: 
+            # no regularization C yields hard-margin
             # constraint for evrry every alpha: 0 =< alpha
             # use matrix notation
             # QP solver wants it: Gx =< h, where h expresses the 0 of the condition
@@ -89,7 +81,7 @@ class svm_qp():
             # first n rows contain the constraint 0 =< alpha -> in G expressed by -1, in h with 0
             # second n rows contain the constraint alpha =< C -> in G expressed by 1, in h with C
             G = np.vstack((-1*np.identity(self.__ydim),np.identity(self.__ydim)))
-            h = np.hstack((np.zeros(self.__ydim),self.C*np.ones(self.__ydim)))
+            h = np.hstack((np.zeros(self.__ydim),self.C/self.__ydim*np.ones(self.__ydim)))
         # this is already implemented so you don't have to
         # read throught the cvxopt manual
         alpha = np.array(qp(cvxmatrix(P, tc='d'),
@@ -99,21 +91,18 @@ class svm_qp():
                             cvxmatrix(A, tc='d'),
                             cvxmatrix(b, tc='d'))['x']).flatten()
         # Support vectors have non zero lagrange multipliers and are smaller than C/m
-        self.sv = np.logical_and(alpha > 1e-5, alpha < np.round(self.C,5)) #treshold 1e-5
+        if self.C is not None:
+            self.sv = np.logical_and(alpha > 1e-5, alpha < np.round(self.C/self.__ydim,5)) #treshold 1e-5
+        else: 
+            # no regularization C yields hard-margin
+            self.sv = alpha > 1e-5
         self.alpha_sv = alpha[self.sv]
         
         self.X_sv = self.X_sv[self.sv]
         self.Y_sv = self.Y_sv[self.sv]
+    
         # calculation of bias b
-        
-        # calculate kernelmatrix for X_sv, makes it independet of the choosen kernel
-        
-        #if self.kernel == 'linear':
-        #    self.__linearKernel(self.X_sv)
-        #elif self.kernel == 'polynomial':
-        #    self.__polynomialKernel(self.X_sv)
-        #elif self.kernel == 'gaussian':
-        #    self.__gaussianKernel(self.X_sv)
+    
         self.kernelmatrix = buildKernel(self.X_sv.T, kernel = self.kernel, kernelparameter = self.kernelparameter)
         
         # b = mean(y[sv] - sum(alpha*y*kernel(X_tr,X[sv]))
@@ -129,31 +118,11 @@ class svm_qp():
     def predict(self, X):
 
         # INSERT_CODE
-        
-        # calculate kernelmatrix
-        #if self.kernel == 'linear':
-        #    self.__linearKernel(X)
-        #elif self.kernel == 'polynomial':
-        #    self.__polynomialKernel(X)
-        #elif self.kernel == 'gaussian':
-        #    self.__gaussianKernel(X)
 
         self.kernelmatrix = buildKernel(self.X_sv.T,X.T, kernel = self.kernel, kernelparameter = self.kernelparameter)
-        self.yhat = np.sign((self.alpha_sv.reshape(-1,1)*self.Y_sv).T @ self.kernelmatrix + self.b)
+        self.yhat = (self.alpha_sv.reshape(-1,1)*self.Y_sv).T @ self.kernelmatrix + self.b
 
         return self.yhat
-    
-    def __linearKernel(self, Y):
-        self.kernelmatrix = self.X_sv.dot(Y.T)
-
-    def __polynomialKernel(self, Y):
-        self.kernelmatrix = (self.X_sv.dot(Y.T) + 1) ** self.kernelparameter
-
-    def __gaussianKernel(self, Y):
-        X_len, X_width = self.X_sv.shape
-        self.kernelmatrix = np.exp(-(
-                    np.diagonal(self.X_sv.dot(self.X_sv.T)).reshape(X_len, 1) - 2 * self.X_sv.dot(
-                Y.T) + np.diagonal(Y.dot(Y.T))) / (2 * (self.kernelparameter ** 2)))
 
 
 
