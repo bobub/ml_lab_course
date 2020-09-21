@@ -18,4 +18,7 @@ for cross validation and kernel ridge regression. These classes are then used to
 reproduce the results of a research paper and investigate 5 different
 classification datasets.
 
+Assignment 4: 
+This assignment focused on SVMs and neural networks. It required the implementation of each,
+and the application to various small datasets.
 
